@@ -1,142 +1,230 @@
-# Chicago Public Schools (2011-12): SQL Analysis of Safety, Attendance and Enrollment
+# 🏫 Chicago Public Schools — SQL Data Analysis
 
-A SQL-driven analysis of the City of Chicago's school progress-report data: **566 schools x 78 columns**, joined to community-area census data. The project loads the raw CSVs into **SQLite**, inspects the schema through the system catalog, and answers 12 analytical questions with filters, aggregates, sub-queries and joins, then interprets what the results mean and which traps a real dataset sets for SQL users.
+A SQL-based analysis of Chicago Public Schools data from 2011–12, using **SQLite**, **Python**, **pandas**, and **Jupyter Notebook**.
 
-It began as the IBM *Working with a Real World Data-set using SQL and Python* lab and was extended into a documented, reproducible project.
+The project explores school safety, attendance, enrollment, and community-area census data to show how SQL can turn a real-world dataset into useful insights. It began as the IBM _Working with a Real World Data-set using SQL and Python_ lab and was extended into a documented, reproducible project.
+
+📊 **566 schools** · **78 columns** · **77 community areas** · **12 SQL problems**
 
 ![Attendance extremes](figures/03_attendance_extremes.png)
 
 ---
 
-## Key results
+## 🎯 Why This Project?
 
-| Question | Result |
-|---|---|
-| Schools in the dataset | **566**, across **78 columns** |
-| Elementary schools | **462** (81.6%) |
-| Highest safety score | **99**, shared by **19 schools** (17 elementary-level, 2 high schools) |
-| Lowest safety score | **1** (Edmond Burke Elementary) |
-| Highest average attendance | **98.4%** (John Charles Haines Elementary) |
-| Schools below 70% attendance | **8**, of which **7 are high schools** (lowest: Richard T. Crane Technical Prep, **57.9%**) |
-| Community areas | **77**, total enrollment **354,346** |
-| Largest / smallest area by enrollment | South Lawndale **14,793** / Oakland **140** (**106x** gap) |
-| Concentration | Top 10 areas hold **28.7%** of all enrolled students; the 38 smallest hold **24.4%** |
-| Hardship index for the largest school's area | **6** (North Center, home of Lane Technical High School) |
+I built this project to practice SQL with a real-world dataset rather than working only with simple practice tables. The project helped me understand how data analysts:
 
-### What the data says
+- 🔎 Explore and filter large datasets
+- 🧹 Handle missing and incorrectly formatted data
+- 🧮 Use SQL for calculations and aggregation
+- 🔗 Combine information from different tables
+- 📊 Turn query results into visualizations
+- 💡 Convert raw data into meaningful findings
 
-1. **Attendance follows school type.** All ten highest attendance rates (97.2-98.4%) belong to elementary-level schools, at least six of them selective programs (Classical, Gifted, Magnet, Language Academy). Of the eight schools below 70%, seven are high schools and one is an early-childhood center: a **40-point spread** between the extremes.
-2. **Safety scores use almost the whole scale.** They run from 1 to 99. Both the top-scoring and bottom-scoring groups contain elementary schools and high schools, so school type alone does not explain safety.
-3. **Enrollment is highly concentrated and right-skewed.** Mean 4,602 vs. median 4,206 students per area, and the largest area is 106x the smallest. Several of the smallest areas (e.g. O'Hare, the Loop) are not primarily residential.
-4. **The biggest school sits in a low-hardship area.** Lane Technical High School (4,368 students) is in North Center, hardship index 6 (on the index's 1-100 scale, higher = more hardship).
-
-<p align="center">
-  <img src="figures/01_enrollment_top_bottom_areas.png" width="95%">
-</p>
-
-<p align="center">
-  <img src="figures/02_enrollment_concentration.png" width="48%">
-  <img src="figures/04_safety_extremes.png" width="48%">
-</p>
+It also taught me an important lesson: real-world data is rarely perfectly clean. Some values were stored as text, some were missing, and some column names were not as straightforward as they first appeared.
 
 ---
 
-## What I did
-
-| Step | Description |
-|---|---|
-| **1. Load** | Read two CSVs with pandas and wrote them to SQLite with `DataFrame.to_sql()`: `CHICAGO_PUBLIC_SCHOOLS_DATA` (566 rows) and `CENSUS_DATA` (78 rows, one per community area plus any summary row). |
-| **2. Inspect the catalog** | Queried `sqlite_master` and `PRAGMA_TABLE_INFO` to list tables, count columns and read declared types: 59 `TEXT`, 12 `REAL`, 7 `INTEGER`. |
-| **3. Handle awkward names** | Worked with mixed-case names and the 6 columns containing spaces/commas/parentheses (`"Elementary, Middle, or High School"`) using double-quoted identifiers. |
-| **4. Query (12 problems)** | Counting, `MAX`, sub-queries, `ORDER BY ... LIMIT`, `NULLS LAST`, `REPLACE`, `CAST`, `GROUP BY` + `SUM`, and joins across the two tables. |
-| **5. Interpret** | Turned each result into a finding and flagged data-quality traps (below). |
-| **6. Package** | Moved each query into its own `.sql` file, wrote a pipeline that rebuilds the database and **checks live results against the originals**, added smoke tests and charts. |
-
-### SQL techniques demonstrated
-
-`COUNT / MAX / SUM` &nbsp;|&nbsp; scalar sub-queries (`= (SELECT MAX(...))`) &nbsp;|&nbsp; `IN (SELECT ... ORDER BY ... LIMIT 1)` &nbsp;|&nbsp; `GROUP BY` &nbsp;|&nbsp; `ORDER BY ... NULLS LAST` &nbsp;|&nbsp; `REPLACE` + `CAST` for text-to-number &nbsp;|&nbsp; table-valued `PRAGMA_TABLE_INFO` &nbsp;|&nbsp; implicit and explicit `JOIN`
-
----
-
-## Data-quality findings (the "real world" part)
-
-| Pitfall | What happened | Safe habit |
-|---|---|---|
-| **Numbers stored as text** | 59 of 78 columns are `TEXT`; attendance is `'96.00%'`. | `CAST(REPLACE(col,'%','') AS REAL)` before comparing or averaging. |
-| **NULLs sort first (ascending)** | Problem 5's "lowest attendance" was *Velma F Thomas Early Childhood Center*, which simply has **no value**. | Filter `IS NOT NULL`, or state `NULLS FIRST/LAST`. |
-| **Text sorting is lexicographic** | Correct here only because every value has two digits before the decimal; `'100.00%'` would sort before `'57.90%'`. | Cast to numeric first. |
-| **Comparing to the string `'None'`** | The lab's safety filter `!= 'None'` works only because `NULL != x` is `NULL` in SQLite. | Use `IS NOT NULL`. |
-| **Ties hidden by `MAX()`** | 19 schools share the top safety score. | `= (SELECT MAX(...))` returns all ties. |
-| **Ambiguous question** | "Community area with the highest College Enrollment" can mean the area of the largest *school* (lab answer: North Center) or the area with the largest *total* (South Lawndale). | Say which reading the query implements; `E07` covers the second. |
-| **Misleading column name** | `COLLEGE_ENROLLMENT` holds 500-1,300 for elementary schools in the sample, so it behaves like each school's total headcount. | Sanity-check values against sample rows before interpreting. |
-
----
-
-## Project structure
+## ⚙️ Project Workflow
 
 ```
-.
+CSV Data
+   ↓
+Python + pandas
+   ↓
+SQLite Database
+   ↓
+Schema Inspection
+   ↓
+SQL Queries
+   ↓
+Data Cleaning
+   ↓
+Analysis
+   ↓
+Graphs & Findings
+```
+
+### 🛠️ Technologies
+
+Python · pandas · SQLite · SQL · matplotlib · Jupyter Notebook
+
+---
+
+## 📌 Key Findings
+
+| Metric / Question                            | Result                                                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Schools in the dataset**                   | **566**, across **78 columns**                                                                |
+| **Elementary schools**                       | **462** (81.6% of total)                                                                      |
+| **Highest safety score**                     | **99**, shared by **19 schools** (17 elementary-level, 2 high schools)                        |
+| **Lowest safety score**                      | **1** (Edmond Burke Elementary)                                                               |
+| **Highest average attendance**               | **98.4%** (John Charles Haines Elementary)                                                    |
+| **Schools below 70% attendance**             | **8**, of which **7 are high schools** (lowest: Richard T. Crane Technical Prep at **57.9%**) |
+| **Community areas**                          | **77**, with a total enrollment of **354,346** students                                       |
+| **Largest / smallest area by enrollment**    | South Lawndale (**14,793**) / Oakland (**140**) — a **106×** difference                       |
+| **Enrollment concentration**                 | Top 10 areas hold **28.7%** of all students; the 38 smallest hold **24.4%**                   |
+| **Hardship index for largest school's area** | **6** (North Center, home of Lane Technical High School)                                      |
+
+### What the Data Says
+
+- 🎓 **Attendance follows school type:** All ten highest attendance rates (97.2%–98.4%) belong to elementary-level schools, at least six of them selective programs (Classical, Gifted, Magnet, Language Academy). Of the 8 schools below 70%, 7 are high schools and 1 is an early-childhood center—creating a **40-point spread** between the extremes.
+
+- 🛡️ **Safety spans the entire scale:** Safety scores range from 1 to 99. Both elementary schools and high schools appear among the highest and lowest safety scores, showing that school type alone does not explain safety.
+
+- 👥 **Enrollment is right-skewed:** With a mean of 4,602 vs. a median of 4,206 students per area, enrollment varies wildly. South Lawndale has roughly 106× more students than Oakland, and several of the smallest areas (like O'Hare and the Loop) are not primarily residential.
+
+- 📈 **Enrollment is heavily concentrated:** Students are not evenly distributed across the city—the top 10 community areas contain **28.7%** of all enrolled students, while the 38 smallest areas combined contain **24.4%**.
+
+- 🏘️ **Low hardship at the largest school:** Lane Technical High School (4,368 students) is located in North Center, which has a hardship index of just 6 (on a 1–100 scale where higher means more hardship).
+
+### 📊 Visual Insights
+
+<p align="center">
+  <img src="figures/01_enrollment_top_bottom_areas.png" width="95%" alt="Top and Bottom Community Areas by Enrollment">
+</p>
+
+<p align="center">
+  <img src="figures/02_enrollment_concentration.png" width="48%" alt="Enrollment Concentration">
+  <img src="figures/04_safety_extremes.png" width="48%" alt="Safety Score Extremes">
+</p>
+
+---
+
+## 🔍 What I Did
+
+| Step                  | Action              | Description                                                                                                                                                     |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. 📥 Load**        | Read & Store        | Loaded the school (`566 rows`) and census (`78 rows`) CSV files using `pandas` and stored them in SQLite via `DataFrame.to_sql()`.                              |
+| **2. 🔬 Inspect**     | Schema Check        | Inspected the database schema using `sqlite_master` and `PRAGMA_TABLE_INFO` to list tables, count columns, and check types (`59 TEXT`, `12 REAL`, `7 INTEGER`). |
+| **3. 🏷️ Clean Names** | Quote Identifiers   | Handled mixed-case column names and the 6 columns containing spaces, commas, or parentheses (e.g., `"Elementary, Middle, or High School"`).                     |
+| **4. 💻 Query**       | Answer 12 Problems  | Wrote 12 SQL queries using counting, `MAX`, subqueries, `ORDER BY ... LIMIT`, `GROUP BY`, and joins across both tables.                                         |
+| **5. 🧹 Fix Data**    | Handle Messy Values | Cleaned percentages stored as text and filtered out `NULL` values so sorting and calculations worked properly.                                                  |
+| **6. 📊 Visualize**   | Plot & Verify       | Created graphs from the query results, organized queries into `.sql` files, and built a pipeline with smoke tests to verify live results.                       |
+
+### 💻 SQL Skills Demonstrated
+
+`SELECT` · `WHERE` · `COUNT()` · `MAX()` · `SUM()` · `GROUP BY` · `ORDER BY` · `LIMIT` · `JOIN` · `Subqueries` · `CAST()` · `REPLACE()` · `NULLS LAST` · `PRAGMA_TABLE_INFO`
+
+**Example of cleaning an attendance value stored as text:**
+
+```sql
+CAST(REPLACE(attendance, '%', '') AS REAL)
+```
+
+---
+
+## 🚧 Data-Quality Findings (The "Real World" Part)
+
+Working with uncleaned civic data revealed several common SQL traps:
+
+| Pitfall                           | What Happened                                                                                                                                                               | Safe Habit                                                                              |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Numbers stored as text**        | 59 of 78 columns are `TEXT`; attendance is stored as `'96.00%'`.                                                                                                            | Use `CAST(REPLACE(col, '%', '') AS REAL)` before comparing or averaging.                |
+| **NULLs sort first (ascending)**  | Problem 5's "lowest attendance" initially returned _Velma F Thomas Early Childhood Center_, which simply had **no value**.                                                  | Filter with `IS NOT NULL`, or explicitly state `NULLS FIRST/LAST`.                      |
+| **Text sorting is lexicographic** | Sorting text worked only because values had two digits before the decimal; `'100.00%'` would sort before `'57.90%'`.                                                        | Always cast strings to numeric types before sorting.                                    |
+| **Comparing to `'None'`**         | The lab's safety filter `!= 'None'` works only because `NULL != x` evaluates to `NULL` in SQLite.                                                                           | Explicitly use `IS NOT NULL`.                                                           |
+| **Ties hidden by `MAX()`**        | 19 schools share the top safety score of 99.                                                                                                                                | Use `= (SELECT MAX(...))` to return all tied rows.                                      |
+| **Ambiguous questions**           | "Community area with the highest College Enrollment" can mean the area of the single largest _school_ (North Center) or the area with the highest _total_ (South Lawndale). | Clarify which interpretation a query uses (extended query `E07` covers the area total). |
+| **Misleading column names**       | `COLLEGE_ENROLLMENT` holds 500–1,300 for elementary schools, meaning it actually represents each school's total student headcount.                                          | Sanity-check values against sample rows before interpreting results.                    |
+
+---
+
+## 🗄️ Data Sources
+
+| Table / File                  | Contents                                                         | Source                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `CHICAGO_PUBLIC_SCHOOLS_DATA` | School-level progress-report metrics, 2011–12 (`566 × 78`)       | [Chicago Data Portal](https://data.cityofchicago.org/Education/Chicago-Public-Schools-Progress-Report-Cards-2011-/9xs2-f89t) |
+| `CENSUS_DATA`                 | Community-area socioeconomic indicators including hardship index | Course-hosted `ChicagoCensusData.csv`                                                                                        |
+
+_(Note: Because raw CSVs are downloaded at runtime, the repository stores the column schema, 8 sample rows, per-area enrollment totals, and the verified outputs of all 12 problems.)_
+
+---
+
+## 📂 Project Structure
+
+```
 ├── README.md
 ├── requirements.txt
-├── run_pipeline.py                  # CSV -> SQLite -> run all SQL -> checks, metrics, charts
-├── src/chicago_sql.py               # load / query / chart helpers
+├── run_pipeline.py                          # CSV -> SQLite -> run all SQL -> checks, metrics, charts
+├── src/
+│   └── chicago_sql.py                       # Load, query, and chart helpers
 ├── sql/
-│   ├── problems/                    # the 12 lab problems, one .sql file each
-│   └── extended/                    # 7 additional analysis queries (E01-E07)
+│   ├── problems/                            # The 12 lab problems, one .sql file each
+│   └── extended/                            # 7 additional analysis queries (E01–E07)
 ├── notebooks/
-│   └── Chicago_Schools_SQL_Analysis.ipynb   # narrative walkthrough with results and insights
-├── data/                            # schema (78 cols), 8 real sample rows, per-area enrollment totals
-├── results/verified_results.json    # outputs of the 12 problems captured from the original run
-├── figures/                         # charts used in this README
-├── tests/test_queries.py            # smoke test: every .sql file runs against the real 78-column schema
-└── original/RealDataPractice_original.ipynb   # the starting lab notebook, untouched
+│   └── Chicago_Schools_SQL_Analysis.ipynb   # Narrative walkthrough with results and insights
+├── data/                                    # Schema (78 cols), sample rows, per-area totals
+├── results/                                 # Verified outputs & reproduction checks
+├── figures/
+│   ├── 01_enrollment_top_bottom_areas.png
+│   ├── 02_enrollment_concentration.png
+│   ├── 03_attendance_extremes.png
+│   └── 04_safety_extremes.png
+├── tests/
+│   └── test_queries.py                      # Smoke tests for every .sql file against the schema
+└── original/
+    └── RealDataPractice_original.ipynb      # Starting lab notebook, untouched
 ```
 
-## How to run
+---
 
-```bash
-pip install -r requirements.txt
+## 🚀 How to Run
 
-# Rebuild the database from the source CSVs (needs internet) and run everything
-python run_pipeline.py
-#   -> RealWorldData.db, results/live_problems/*.csv, results/extended/*.csv,
-#      results/reproduction_check.csv, results/extended_metrics.json, new figures
+1. **Install dependencies:**
 
-# Or use local copies of the CSVs
-python run_pipeline.py --schools-csv ChicagoPublicSchools.csv --census-csv ChicagoCensusData.csv
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-jupyter notebook notebooks/Chicago_Schools_SQL_Analysis.ipynb
-python tests/test_queries.py
-```
+2. **Rebuild the database and run the full pipeline:**
 
-`results/reproduction_check.csv` reports, for each of the 12 problems, whether the live result **matches** the output captured in the original run. The notebook works in two modes: without `RealWorldData.db` it displays the captured results; with it, every cell re-runs the SQL live.
+   ```bash
+   # Downloads source CSVs (requires internet), runs all queries, checks results, and builds charts
+   python run_pipeline.py
 
-## Data
+   # Or run using local copies of the CSVs:
+   python run_pipeline.py --schools-csv ChicagoPublicSchools.csv --census-csv ChicagoCensusData.csv
+   ```
 
-| Table / file | Contents | Source |
-|---|---|---|
-| `CHICAGO_PUBLIC_SCHOOLS_DATA` | School-level progress-report metrics, 2011-12 (566 x 78) | [Chicago Data Portal](https://data.cityofchicago.org/Education/Chicago-Public-Schools-Progress-Report-Cards-2011-/9xs2-f89t), course-hosted CSV |
-| `CENSUS_DATA` | Community-area socioeconomic indicators incl. hardship index | Course-hosted `ChicagoCensusData.csv` |
+3. **Explore the Jupyter Notebook:**
 
-Because the raw CSVs are downloaded at run time, the repository stores only what the original run produced: the column schema, 8 sample rows, the per-community-area enrollment totals and the outputs of all 12 problems.
+   ```bash
+   jupyter notebook notebooks/Chicago_Schools_SQL_Analysis.ipynb
+   ```
 
-## Limitations
+4. **Run the query tests:**
+   ```bash
+   python tests/test_queries.py
+   ```
 
-- **Scope of reported numbers.** Results above are the 12 lab problems plus statistics derived from their outputs. The extended queries (school-type profile, safety vs. attendance and hardship, area safety rankings, data-completeness audit) are implemented in `sql/extended/` and exercised against the real schema, but **their full-dataset results have not been generated yet**; run `python run_pipeline.py` to produce them.
-- **Single school year (2011-12)**; descriptive statistics only, no causal claims.
-- **School type for charts is inferred from school names** ("High School" in the name) where the type column was not part of the captured output.
-- **Enrollment totals** count students in schools *located* in each area, not residents, and ignore schools with missing values.
+---
 
-## Next steps
+## ⚠️ Limitations & Next Steps
 
-- Run the extended queries and add the generated correlation charts (safety vs. attendance, area safety vs. hardship).
-- Compare attendance and safety across school types with the full table.
-- Add window functions (e.g. rank schools within each community area) and views for repeated logic.
+### Limitations
 
-## Tech stack
+- **Scope:** Reported numbers cover the 12 core lab problems. Extended queries in `sql/extended/` are implemented and tested against the schema, and running `python run_pipeline.py` generates their full-dataset outputs.
+- **Timeframe:** Covers a single school year (2011–12) using descriptive statistics only (no causal claims).
+- **Inferred School Types:** School types in charts were inferred from school names (e.g., `"High School"`) where the type column wasn't part of the captured output.
+- **Enrollment Counts:** Totals count students attending schools _located_ in each community area rather than residents, ignoring schools with missing values.
 
-SQL (SQLite) · Python · pandas · matplotlib · Jupyter
+### Next Steps
 
-## Credits
+- 📉 Generate and embed correlation charts from the extended queries (safety vs. attendance, area safety vs. hardship).
+- 🏫 Compare attendance and safety across school types using the full table.
+- 🪟 Implement SQL window functions (e.g., ranking schools within each community area) and reusable views.
 
-Based on the IBM Skills Network lab *Working with a Real World Data-set using SQL and Python*, using data from the City of Chicago Data Portal.
+---
+
+## 💡 Main Takeaway
+
+This project demonstrates how **SQL + Python + visualization** can transform a large, messy dataset into clear and understandable findings. More importantly, it gave me practical experience working with real-world data problems—like text-formatted numbers, `NULL` sorting quirks, and ambiguous column names—rather than just writing SQL queries against perfectly clean tables.
+
+---
+
+## 👋 Connect With Me
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/kashaf-malik-738689304)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Kash-cyber)
+[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:kashafqaiser1707@gmail.com)
